@@ -45,7 +45,7 @@ class Web(QThread):
             os.makedirs('./temp/cache/')
         # Save Session Section
         self.__platform = platform.system().lower()
-        if self.__platform != 'windows' and self.__platform != 'linux':
+        if self.__platform not in ['windows', 'linux']:
             raise OSError('Only Windows and Linux are supported for now.')
 
         self.__browser_choice = 0
@@ -90,10 +90,9 @@ class Web(QThread):
         self.__driver.set_window_size(670, 800)
 
     def is_logged_in(self):
-        status = self.__driver.execute_script(
+        return self.__driver.execute_script(
             "if (document.querySelector('*[data-icon=chat]') !== null) { return true } else { return false }"
         )
-        return status
 
     def ANALYZ(self):
         try:
@@ -327,11 +326,10 @@ class Web(QThread):
                         '//input[@accept="image/*,video/mp4,video/3gpp,video/quicktime"]')
                     attch.send_keys(self.path)
                     time.sleep(2)
-                    if self.text != '' or self.text != ' ':
-                        caption = self.__driver.find_element_by_xpath(
-                            '/html/body/div[1]/div/div/div[2]/div[2]/span/div/span/div/div/div[2]/div/div[1]/div[3]/div/div/div[2]/div[1]/div[2]')
-                        caption.send_keys(self.text)
-                        time.sleep(2)
+                    caption = self.__driver.find_element_by_xpath(
+                        '/html/body/div[1]/div/div/div[2]/div[2]/span/div/span/div/div/div[2]/div/div[1]/div[3]/div/div/div[2]/div[1]/div[2]')
+                    caption.send_keys(self.text)
+                    time.sleep(2)
                     self.__driver.find_element_by_xpath(
                         '/html/body/div[1]/div/div/div[2]/div[2]/span/div/span/div/div/div[2]/div/div[2]/div[2]/div/div/span').click()
                     f += 1
@@ -417,17 +415,23 @@ class Web(QThread):
     def __refresh_profile_list(self):
         if self.__browser_choice == CHROME:
             self.__browser_profile_list = ['']
-            for profile_dir in os.listdir(self.__browser_user_dir):
-                if 'profile' in profile_dir.lower():
-                    if profile_dir != 'System Profile':
-                        self.__browser_profile_list.append(profile_dir)
+            self.__browser_profile_list.extend(
+                profile_dir
+                for profile_dir in os.listdir(self.__browser_user_dir)
+                if 'profile' in profile_dir.lower()
+                and profile_dir != 'System Profile'
+            )
+
         elif self.__browser_choice == FIREFOX:
             # TODO: consider reading out the profiles.ini
-            self.__browser_profile_list = []
-            for profile_dir in os.listdir(self.__browser_user_dir):
-                if not profile_dir.endswith('.default'):
-                    if os.path.isdir(os.path.join(self.__browser_user_dir, profile_dir)):
-                        self.__browser_profile_list.append(profile_dir)
+            self.__browser_profile_list = [
+                profile_dir
+                for profile_dir in os.listdir(self.__browser_user_dir)
+                if not profile_dir.endswith('.default')
+                and os.path.isdir(
+                    os.path.join(self.__browser_user_dir, profile_dir)
+                )
+            ]
 
     def __get_indexed_db(self):
         self.__driver.execute_script('window.waScript = {};'
@@ -455,9 +459,7 @@ class Web(QThread):
                                      'getAllObjects();')
         while not self.__driver.execute_script('return window.waScript.waSession != undefined;'):
             time.sleep(1)
-        wa_session_list = self.__driver.execute_script(
-            'return window.waScript.waSession;')
-        return wa_session_list
+        return self.__driver.execute_script('return window.waScript.waSession;')
 
     def __get_profile_storage(self, profile_name=None):
         self.__refresh_profile_list()
@@ -492,15 +494,17 @@ class Web(QThread):
                 verified_wa_profile_list = False
                 while not verified_wa_profile_list:
                     time.sleep(1)
-                    verified_wa_profile_list = False
-                    for object_store_obj in self.__get_indexed_db():
-                        if 'WASecretBundle' in object_store_obj['key']:
-                            verified_wa_profile_list = True
-                            break
+                    verified_wa_profile_list = any(
+                        'WASecretBundle' in object_store_obj['key']
+                        for object_store_obj in self.__get_indexed_db()
+                    )
+
         else:
             if self.__browser_choice == CHROME:
                 options.add_argument(
-                    'user-data-dir=%s' % os.path.join(self.__browser_user_dir, profile_name))
+                    f'user-data-dir={os.path.join(self.__browser_user_dir, profile_name)}'
+                )
+
                 self.__driver = webdriver.Chrome(options=options)
             elif self.__browser_choice == FIREFOX:
                 fire_profile = webdriver.FirefoxProfile(
@@ -538,19 +542,13 @@ class Web(QThread):
             else:
                 raise ValueError(
                     'The specified browser is invalid. Try to use "chrome" or "firefox" instead.')
-        else:
-            if browser == CHROME:
-                pass
-            elif browser == FIREFOX:
-                pass
-            else:
-                raise ValueError(
-                    'Browser type invalid. Try to use WaWebSession.CHROME or WaWebSession.FIREFOX instead.')
-
+        elif browser in [CHROME, FIREFOX]:
             self.__browser_choice = browser
+        else:
+            raise ValueError(
+                'Browser type invalid. Try to use WaWebSession.CHROME or WaWebSession.FIREFOX instead.')
 
     def get_active_session(self, use_profile=None):
-        profile_storage_dict = {}
         use_profile_list = []
         self.__refresh_profile_list()
 
@@ -558,7 +556,7 @@ class Web(QThread):
             raise ValueError('Profile does not exist: %s', use_profile)
         elif use_profile is None:
             return self.__get_profile_storage()
-        elif use_profile and use_profile in self.__browser_profile_list:
+        elif use_profile:
             use_profile_list.append(use_profile)
         elif type(use_profile) == list:
             use_profile_list.extend(self.__browser_profile_list)
@@ -566,20 +564,19 @@ class Web(QThread):
             raise ValueError(
                 "Invalid profile provided. Make sure you provided a list of profiles or a profile name.")
 
-        for profile in use_profile_list:
-            profile_storage_dict[profile] = self.__get_profile_storage(profile)
-
-        return profile_storage_dict
+        return {
+            profile: self.__get_profile_storage(profile)
+            for profile in use_profile_list
+        }
 
     def create_new_session(self):
         return self.__get_profile_storage()
 
     def access_by_obj(self, wa_profile_list):
-        verified_wa_profile_list = False
-        for object_store_obj in wa_profile_list:
-            if 'WASecretBundle' in object_store_obj['key']:
-                verified_wa_profile_list = True
-                break
+        verified_wa_profile_list = any(
+            'WASecretBundle' in object_store_obj['key']
+            for object_store_obj in wa_profile_list
+        )
 
         if not verified_wa_profile_list:
             raise ValueError(
@@ -640,11 +637,11 @@ class Web(QThread):
             with open(profile_file, 'r') as file:
                 wa_profile_list = json.load(file)
 
-            verified_wa_profile_list = False
-            for object_store_obj in wa_profile_list:
-                if 'WASecretBundle' in object_store_obj['key']:
-                    verified_wa_profile_list = True
-                    break
+            verified_wa_profile_list = any(
+                'WASecretBundle' in object_store_obj['key']
+                for object_store_obj in wa_profile_list
+            )
+
             if verified_wa_profile_list:
                 self.access_by_obj(wa_profile_list)
             else:
@@ -657,12 +654,12 @@ class Web(QThread):
     def save_profile(self, wa_profile_list, file_path):
         file_path = os.path.normpath(file_path)
 
-        verified_wa_profile_list = False
-        for object_store_obj in wa_profile_list:
-            if 'key' in object_store_obj:
-                if 'WASecretBundle' in object_store_obj['key']:
-                    verified_wa_profile_list = True
-                    break
+        verified_wa_profile_list = any(
+            'key' in object_store_obj
+            and 'WASecretBundle' in object_store_obj['key']
+            for object_store_obj in wa_profile_list
+        )
+
         if verified_wa_profile_list:
             with open(file_path, 'w') as file:
                 json.dump(wa_profile_list, file, indent=4)
@@ -670,21 +667,19 @@ class Web(QThread):
             saved_profiles = 0
             for profile_name in wa_profile_list.keys():
                 profile_storage = wa_profile_list[profile_name]
-                verified_wa_profile_list = False
-                for object_store_obj in profile_storage:
-                    if 'key' in object_store_obj:
-                        if 'WASecretBundle' in object_store_obj['key']:
-                            verified_wa_profile_list = True
-                            break
+                verified_wa_profile_list = any(
+                    'key' in object_store_obj
+                    and 'WASecretBundle' in object_store_obj['key']
+                    for object_store_obj in profile_storage
+                )
+
                 if verified_wa_profile_list:
                     single_profile_name = os.path.basename(
                         file_path) + '-' + profile_name
                     self.save_profile(profile_storage, os.path.join(
                         os.path.dirname(file_path), single_profile_name))
                     saved_profiles += 1
-            if saved_profiles > 0:
-                pass
-            else:
+            if saved_profiles <= 0:
                 raise ValueError(
                     'Could not find any profiles in the list. Make sure to specified file path is correct.')
 
