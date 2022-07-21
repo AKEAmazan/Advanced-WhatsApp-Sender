@@ -61,7 +61,7 @@ class Main():
         icon = QIcon()
         icon.addPixmap(QPixmap(":/main/icon.ico"), QIcon.Normal, QIcon.Off)
         self.MainWindow.setWindowIcon(icon)
-        
+
         self.oldPos = self.MainWindow.pos()
         self.RememberLogin = True
         self.ui.sleepMin.setValidator(self.validator)
@@ -310,7 +310,7 @@ class Main():
                                     NUMBERS.append(n)
                             except:
                                 continue
-            elif type == 'xlsx' or type == 'xls':
+            elif type in ['xlsx', 'xls']:
                 wb = xlrd.open_workbook(path)
                 sheet = wb.sheet_by_index(0)
                 for c in range(sheet.ncols):
@@ -322,7 +322,7 @@ class Main():
                             pass
                         try:
                             num = str(int(nume))
-                            if len(str(num)) >= 9:
+                            if len(num) >= 9:
                                 s98 = re.compile(fr"^{self.areaCode}", re.I)
                                 s0 = re.compile('^0', re.I)
                                 if s98.search(num):
@@ -346,11 +346,9 @@ class Main():
                         table = f"CREATE TABLE IF NOT EXISTS `{TableNow}` (num INT PRIMARY KEY NOT NULL, status VARCHAR(50), res VARCHAR(12))"
                         dbi.execute(table)
                         print("Table OK")
-                        i = 1
-                        for num in NUMBERS:
+                        for i, num in enumerate(NUMBERS, start=1):
                             insert = f"INSERT INTO `{TableNow}` (num,status) VALUES ('{num}','')"
                             dbi.execute(insert)
-                            i += 1
                         dbi.commit()
                 except:
                     try:
@@ -368,11 +366,9 @@ class Main():
                         table = f"CREATE TABLE IF NOT EXISTS `{TableNow}` (num INT PRIMARY KEY NOT NULL, status VARCHAR(50), res VARCHAR(12))"
                         dbi.execute(table)
                         print("Table OK")
-                        i = 1
-                        for num in NUMBERS:
+                        for i, num in enumerate(NUMBERS, start=1):
                             insert = f"INSERT INTO `{TableNow}` (num,status) VALUES ('{num}','')"
                             dbi.execute(insert)
-                            i += 1
                         dbi.commit()
                 self.ui.LogBox.clear()
                 self.ui.LogBox.appendPlainText("--- Numbers entered successfully ---")
@@ -390,7 +386,6 @@ class Main():
                     pass
         else:
             print("Not Selected File!")
-            pass
 
     def msgError(self, errorText='مشکلی پیش آمده است !!!', icon='', colorf="#ff0000"):
         box = QMessageBox()
@@ -405,10 +400,7 @@ class Main():
         box.setText(errorText)
         box.setStandardButtons(QMessageBox.Yes)
         buttonY = box.button(QMessageBox.Yes)
-        if self.language == 'EN':
-            tx = "       OK       "
-        else:
-            tx = "       تایید       "
+        tx = "       OK       " if self.language == 'EN' else "       تایید       "
         buttonY.setText(tx)
         box.setStyleSheet("""QMessageBox{\n
                           background-color:    #d9c9a3    ;\n
@@ -486,26 +478,27 @@ class Main():
             print("nwa Db Not Open")
 
     def EndWork(self, msg=''):
-        if not self.stopProgress:
-            self.ui.btn_start.setEnabled(True)
-            self.ui.btn_stop.setEnabled(False)
-            self.ui.btn_import.setEnabled(True)
-            self.ui.btn_gnarate.setEnabled(True)
-            self.ui.start_tab.setEnabled(True)
-            self.ui.btn_export.setEnabled(True)
-            self.ui.btn_clear.setEnabled(True)
-            try:
-                self.ui.LogBox.appendPlainText(msg)
-                loder = LoadingScreen(timeout=4)
-                loder.exec_()
-            except Exception as e:
-                if hasattr(e, 'message'):
-                    print(e.message)
-                    errormsg = e.message
-                else:
-                    print(e)
-                    errormsg = e
-                self.msgError(f"{errormsg}")
+        if self.stopProgress:
+            return
+        self.ui.btn_start.setEnabled(True)
+        self.ui.btn_stop.setEnabled(False)
+        self.ui.btn_import.setEnabled(True)
+        self.ui.btn_gnarate.setEnabled(True)
+        self.ui.start_tab.setEnabled(True)
+        self.ui.btn_export.setEnabled(True)
+        self.ui.btn_clear.setEnabled(True)
+        try:
+            self.ui.LogBox.appendPlainText(msg)
+            loder = LoadingScreen(timeout=4)
+            loder.exec_()
+        except Exception as e:
+            if hasattr(e, 'message'):
+                print(e.message)
+                errormsg = e.message
+            else:
+                print(e)
+                errormsg = e
+            self.msgError(f"{errormsg}")
 
     def stop_progress(self):
         print("stop")
@@ -573,14 +566,8 @@ class Main():
                     numList.append(num)
                 sleepMin = self.ui.sleepMin.text()
                 sleepMax = self.ui.sleepMax.text()
-                if sleepMin != '':
-                    sleepMin = int(sleepMin)
-                else:
-                    sleepMin = 3
-                if sleepMax != '':
-                    sleepMax = int(sleepMax)
-                else:
-                    sleepMax = 6
+                sleepMin = int(sleepMin) if sleepMin != '' else 3
+                sleepMax = int(sleepMax) if sleepMax != '' else 6
                 self.MsgThread = Web(counter_start=0, step='M', numList=numList, sleepMin=sleepMin, sleepMax=sleepMax,
                                      text=text, Remember=self.RememberLogin)
                 self.MsgThread.start()
@@ -615,14 +602,8 @@ class Main():
                     numList.append(num)
                 sleepMin = self.ui.sleepMin_I.text()
                 sleepMax = self.ui.sleepMax_I.text()
-                if sleepMin != '':
-                    sleepMin = int(sleepMin)
-                else:
-                    sleepMin = 3
-                if sleepMax != '':
-                    sleepMax = int(sleepMax)
-                else:
-                    sleepMax = 6
+                sleepMin = int(sleepMin) if sleepMin != '' else 3
+                sleepMax = int(sleepMax) if sleepMax != '' else 6
                 self.ImgThread = Web(counter_start=0, step='I', numList=numList, sleepMin=sleepMin, sleepMax=sleepMax,
                                      text=caption, path=path, Remember=self.RememberLogin)
                 self.ImgThread.start()
@@ -692,7 +673,7 @@ class Main():
                         currentIndex = self.ui.start_tab.currentIndex()
                         if currentIndex == 0:
                             self.btnStatus()
-                            self.ui.LogBox.appendPlainText(f"-- Start analysis --")
+                            self.ui.LogBox.appendPlainText("-- Start analysis --")
                             self.AnalyzNum()
                         elif currentIndex == 1:
                             print("message Tab")
@@ -700,7 +681,7 @@ class Main():
                             print(text)
                             if text != '':
                                 self.btnStatus()
-                                self.ui.LogBox.appendPlainText(f"-- Start Send Message --")
+                                self.ui.LogBox.appendPlainText("-- Start Send Message --")
                                 self.sendMsg(text)
                             else:
                                 if self.language == 'EN':
@@ -712,7 +693,7 @@ class Main():
                             print('image tab')
                             if self.p != '':
                                 caption = self.ui.caption.toPlainText()
-                                self.ui.LogBox.appendPlainText(f"-- Start Send Image --")
+                                self.ui.LogBox.appendPlainText("-- Start Send Image --")
                                 self.sendImg(path=self.p, caption=caption)
                                 self.btnStatus()
                             else:
@@ -830,38 +811,39 @@ class Main():
         RangeNum = self.frOM.generate_count.text()
         if RangeNum == '':
             RangeNum = 10
-        if firstNumber != '':
-            if not len(firstNumber) < 10:
-                loder = LoadingScreen()
-                loder.exec_()
-                path = f"temp\generate-{self.Time()}.csv"
-                print(firstNumber, path)
-                for i in range(int(RangeNum)):
-                    with open(f"{path}", 'a+') as g:
-                        writer = csv.writer(g, delimiter=';', quotechar='"', quoting=csv.QUOTE_ALL,
-                                            lineterminator='\n')
-                        writer.writerow([f"{firstNumber}"])
-                    firstNumber = int(firstNumber) + 1
-                    # print(firstNumber)
-                self.generateForm.close()
-                self.ListLoader(path)
-                if self.language == 'EN':
-                    msg = "List created successfully."
-                else:
-                    msg = "لیست با موفقیت ایجاد شد."
-                self.msgError(errorText=msg, icon='Information', colorf="#214917")
-                os.remove(path)
-            else:
-                if self.language == 'EN':
-                    msg = "The first number must be 10 digits"
-                else:
-                    msg = "اولین شماره باید 10 رقم باشد"
-                self.msgError(msg)
-        else:
+        if firstNumber == '':
             if self.language == 'EN':
                 msg = "You must enter the first number you want."
             else:
                 msg = "باید اولین شماره مورد نظر خود را وارد کنید."
+            self.msgError(msg)
+
+        elif len(firstNumber) >= 10:
+            loder = LoadingScreen()
+            loder.exec_()
+            path = f"temp\generate-{self.Time()}.csv"
+            print(firstNumber, path)
+            for _ in range(int(RangeNum)):
+                with open(f"{path}", 'a+') as g:
+                    writer = csv.writer(g, delimiter=';', quotechar='"', quoting=csv.QUOTE_ALL,
+                                        lineterminator='\n')
+                    writer.writerow([f"{firstNumber}"])
+                firstNumber = int(firstNumber) + 1
+            self.generateForm.close()
+            self.ListLoader(path)
+            msg = (
+                "List created successfully."
+                if self.language == 'EN'
+                else "لیست با موفقیت ایجاد شد."
+            )
+
+            self.msgError(errorText=msg, icon='Information', colorf="#214917")
+            os.remove(path)
+        else:
+            if self.language == 'EN':
+                msg = "The first number must be 10 digits"
+            else:
+                msg = "اولین شماره باید 10 رقم باشد"
             self.msgError(msg)
 
     def importer(self):
